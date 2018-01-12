@@ -66,7 +66,8 @@ func annfield(anns []string)[]map[string]interface{}{
 	return res
 }
 
-
+//unpacks maps into main map
+//similar to ** operator in python
 func unpack(main map[string]interface{}, maps ...map[string]interface{}){
 	var temp map[string]interface{}
 	for _,temp=range maps{
@@ -79,6 +80,7 @@ func unpack(main map[string]interface{}, maps ...map[string]interface{}){
 }
 
 func vcf_transform(filename string)  {
+	//Opens vcf and loops over rows
 	f, err := os.Open(filename)
 
 	r := io.Reader(f)
@@ -93,6 +95,7 @@ func vcf_transform(filename string)  {
 		if variant==nil{
 			break
 		}
+		//if ANN in vcf use annfield record parser
 		var _,ann_check=variant.Header.Infos["ANN"]
 		if ann_check{
 			parse_vcf_record_ANN(variant,encoder)
@@ -168,6 +171,7 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 }
 
 func parse_vcf_record_ANN(variant *vcfgo.Variant,encoder *json.Encoder)  {
+	//assign fields common to the row
 	var common_fields = make(map[string]interface{})
 	common_fields["CHROM"]=variant.Chromosome
 	common_fields["POS"]=variant.Pos
@@ -180,6 +184,7 @@ func parse_vcf_record_ANN(variant *vcfgo.Variant,encoder *json.Encoder)  {
 	var ann_strings []string
 	var res interface{}
 	var s reflect.Value
+	//parse the info fields
 	for _,info_key=range variant.Info().Keys(){
 		if info_key=="ANN"{
 			res,_=variant.Info().Get(info_key)
@@ -203,17 +208,16 @@ func parse_vcf_record_ANN(variant *vcfgo.Variant,encoder *json.Encoder)  {
 	var t reflect.Type
 	var alt string
 	var index int
+	//loop over alts
 	for index,alt=range variant.Alt(){
 		var alt_fields = make(map[string]interface{})
 		alt_fields["ALT"]=alt
-		//
-		//Put annfield here
-		//
 		if len(variant.Samples)<1{
 			unpack(alt_fields,common_fields)
 			encoder.Encode(alt_fields)
 			continue
 		}
+		//loop over samples
 		for _,sample:=range variant.Samples{
 			var found = false
 			var gt int
@@ -248,9 +252,12 @@ func parse_vcf_record_ANN(variant *vcfgo.Variant,encoder *json.Encoder)  {
 				}
 			}
 			var ann map[string]interface{}
+			//for each sample loop over anns and link
 			for _,ann=range anns{
-				unpack(ann,sample_fields,common_fields,alt_fields)
-				encoder.Encode(ann)
+				if (reflect.ValueOf(ann["ANN_allele"]).String()==alt){
+					unpack(ann,sample_fields,common_fields,alt_fields)
+					encoder.Encode(ann)
+				}
 			}
 		}
 	}
