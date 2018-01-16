@@ -9,7 +9,8 @@ import (
 	"reflect"
 	"flag"
 	"strings"
-	"fmt"
+	"strconv"
+	"compress/gzip"
 )
 
 func annfield(anns []string)[]map[string]interface{}{
@@ -44,24 +45,26 @@ func annfield(anns []string)[]map[string]interface{}{
 	}
 	// specs page 2:
 	// Multiple effects / consequences are separated by comma.
-	var eff_string string
-	var effs []string
-	var res= make([]map[string]interface{},len(anns))
-	var index int
-	for index,eff_string= range anns{
+	var ann_string string
+	var ann_arr []string
+	var res= make([]map[string]interface{},0)
+	var effects []string
+	for _, ann_string = range anns{
 		var eff_map=make(map[string]interface{})
-		effs=strings.Split(eff_string,"|")
+		ann_arr =strings.Split(ann_string,"|")
+		effects=strings.Split(ann_arr[1],"&")
 		var i int
-		var val string
-		for i,val=range effs{
-			if i>=len(effs){
-				fmt.Println()
-				fmt.Println(effs[0])
-				os.Exit(0)
+		var val,effect string
+		for _,effect=range effects{
+			for i,val=range ann_arr {
+				if i ==1{
+					eff_map["ANN_"+field_list[i]]=effect
+				}else if val!=""{
+					eff_map["ANN_"+field_list[i]]=val
+				}
 			}
-			eff_map["ANN_"+field_list[i]]=val
+			res=append(res, eff_map)
 		}
-		res[index]=eff_map
 	}
 	return res
 }
@@ -79,100 +82,38 @@ func unpack(main map[string]interface{}, maps ...map[string]interface{}){
 	}
 }
 
-func vcf_transform(filename string)  {
+func vcf_transform(filename string,gzipped bool)  {
 	//Opens vcf and loops over rows
 	f, err := os.Open(filename)
-
-	r := io.Reader(f)
+	var r io.Reader
+	if gzipped{
+		r,_=gzip.NewReader(f)
+	}else{
+		r=io.Reader(f)
+	}
 	vr, err := vcfgo.NewReader(r, false)
 	if err != nil {
 		panic(err)
 	}
 	var variant *vcfgo.Variant
-	var encoder=json.NewEncoder(bufio.NewWriter(os.Stdout))
+	var out=bufio.NewWriter(os.Stdout)
+	var encoder=json.NewEncoder(out)
 	for {
 		variant = vr.Read()
 		if variant==nil{
 			break
 		}
-		//if ANN in vcf use annfield record parser
-		var _,ann_check=variant.Header.Infos["ANN"]
-		if ann_check{
-			parse_vcf_record_ANN(variant,encoder)
-		}else {
-			parse_vcf_record(variant,encoder)
-		}
+		parse_vcf_record(variant,encoder)
 
 	}
+	out.Flush()
 }
+
 
 func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
-	var common_fields = make(map[string]interface{})
-	common_fields["CHROM"]=variant.Chromosome
-	common_fields["POS"]=variant.Pos
-	common_fields["REF"]=variant.Reference
-	common_fields["QUAL"]=variant.Quality
-	common_fields["ID"]=variant.Id_
-	common_fields["FILTER"]=strings.Split(variant.Filter,";")
-	var info_key string
-	for _,info_key=range variant.Info().Keys(){
-		res,_:=variant.Info().Get(info_key)
-		common_fields["INFO_"+info_key]=res
-	}
-	var v,key reflect.Value
-	var t reflect.Type
-	var alt string
-	var index int
-	for index,alt=range variant.Alt(){
-		var alt_fields = make(map[string]interface{})
-		alt_fields["ALT"]=alt
-		if len(variant.Samples)<1{
-			unpack(alt_fields,common_fields)
-			encoder.Encode(alt_fields)
-			continue
-		}
-		for _,sample:=range variant.Samples{
-			var found = false
-			var gt int
-			for _,gt=range sample.GT{
-				if index+1==gt{
-					found=true
-				}
-			}
-			if !found {
-				continue
-			}
-			var sample_fields = make(map[string]interface{})
-			sample_fields["sample"]=variant.Header.SampleNames[index]
-			v=reflect.ValueOf(sample).Elem()
-			t=v.Type()
-			for i := 0; i < v.NumField(); i++ {
-				if(t.Field(i).Name=="Fields"){
-					//var field_v reflect.Value
-					//var field_t reflect.Type
-					var check bool
-					for _,key=range v.Field(i).MapKeys(){
-						_,check= sample_fields[key.String()]
-						if !check{
-							//fmt.Println(key.Interface())
-							sample_fields[key.String()]=v.Field(i).MapIndex(key).Interface()
-						}
-					}
-
-
-				}else{
-					sample_fields[t.Field(i).Name]=v.Field(i).Interface()
-				}
-			}
-			unpack(sample_fields,common_fields,alt_fields)
-			encoder.Encode(sample_fields)
-		}
-	}
-}
-
-func parse_vcf_record_ANN(variant *vcfgo.Variant,encoder *json.Encoder)  {
 	//assign fields common to the row
 	var common_fields = make(map[string]interface{})
+	common_fields["type"]="variant_vcf"
 	common_fields["CHROM"]=variant.Chromosome
 	common_fields["POS"]=variant.Pos
 	common_fields["REF"]=variant.Reference
@@ -182,13 +123,12 @@ func parse_vcf_record_ANN(variant *vcfgo.Variant,encoder *json.Encoder)  {
 	var info_key string
 	var anns []map[string]interface{}
 	var ann_strings []string
-	var res interface{}
-	var s reflect.Value
 	//parse the info fields
 	for _,info_key=range variant.Info().Keys(){
+		var res,_=variant.Info().Get(info_key)
+		var s=reflect.ValueOf(res)
+		var err error
 		if info_key=="ANN"{
-			res,_=variant.Info().Get(info_key)
-			s=reflect.ValueOf(res)
 			ann_strings=make([]string, s.Len())
 			for i := 0; i < s.Len(); i++{
 				ann_strings[i]=s.Index(i).String()
@@ -199,63 +139,93 @@ func parse_vcf_record_ANN(variant *vcfgo.Variant,encoder *json.Encoder)  {
 				anns=annfield(ann_strings)
 			}
 		}else{
-			anns=[]map[string]interface{}{}
-			res,_=variant.Info().Get(info_key)
-			common_fields["INFO_"+info_key]=res
+			if variant.Header.Infos[info_key].Number!="1"{
+				common_fields["INFO_"+info_key] = res
+			}else {
+				switch key_type := variant.Header.Infos[info_key].Type; key_type {
+				case "Integer":
+					common_fields["INFO_"+info_key]= s.Int()
+				case "Float":
+					common_fields["INFO_"+info_key]= s.Float()
+				case "String":
+					common_fields["INFO_"+info_key] = s.String()
+				case "Flag":
+					common_fields["INFO_"+info_key] = true
+				default:
+					panic(res)
+				}
+			}
+			if err!=nil{
+				panic(err)
+			}
 		}
 	}
-	var v,key reflect.Value
-	var t reflect.Type
 	var alt string
 	var index int
 	//loop over alts
-	for index,alt=range variant.Alt(){
-		var alt_fields = make(map[string]interface{})
-		alt_fields["ALT"]=alt
-		if len(variant.Samples)<1{
-			unpack(alt_fields,common_fields)
+	for index,alt=range variant.Alt() {
+		var alt_fields= make(map[string]interface{})
+		alt_fields["ALT"] = alt
+		if len(variant.Samples) < 1 {
+			unpack(alt_fields, common_fields)
 			encoder.Encode(alt_fields)
 			continue
 		}
 		//loop over samples
-		for _,sample:=range variant.Samples{
-			var found = false
+		for _, sample := range variant.Samples {
+			var found= false
 			var gt int
-			for _,gt=range sample.GT{
-				if index+1==gt{
-					found=true
+			for _, gt = range sample.GT {
+				if index+1 == gt {
+					found = true
 				}
 			}
 			if !found {
 				continue
 			}
-			var sample_fields = make(map[string]interface{})
-			sample_fields["sample"]=variant.Header.SampleNames[index]
-			v=reflect.ValueOf(sample).Elem()
-			t=v.Type()
-			for i := 0; i < v.NumField(); i++ {
-				if(t.Field(i).Name=="Fields"){
-					//var field_v reflect.Value
-					//var field_t reflect.Type
-					var check bool
-					for _,key=range v.Field(i).MapKeys(){
-						_,check= sample_fields[key.String()]
-						if !check{
-							//fmt.Println(key.Interface())
-							sample_fields[key.String()]=v.Field(i).MapIndex(key).Interface()
+			var sample_fields= make(map[string]interface{})
+			sample_fields["sample"] = variant.Header.SampleNames[index]
+			var key, val string
+			var err error
+			for key, val = range sample.Fields {
+				if key != "DP" && key !="GT" &&key !="MQ" && key !="GL" && key !="GQ" && key !="AD"{
+					if variant.Header.SampleFormats[key].Number!="1"{
+						sample_fields[key]=val
+					}else{
+						switch key_type := variant.Header.SampleFormats[key].Type; key_type {
+						case "Integer":
+							sample_fields[key], err = strconv.Atoi(val)
+						case "Float":
+							if val !="."{
+								sample_fields[key], err = strconv.ParseFloat(val, 64)
+							}
+						case "String":
+							sample_fields[key] = val
+						default:
+							panic(val)
 						}
 					}
-
-
-				}else{
-					sample_fields[t.Field(i).Name]=v.Field(i).Interface()
+					if err!=nil{
+						panic(err)
+					}
 				}
 			}
+			sample_fields["DP"]=sample.DP
+			sample_fields["GT"]=sample.GT
+			sample_fields["MQ"]=sample.MQ
+			sample_fields["GL"]=sample.GL
+			sample_fields["GQ"]=sample.GQ
+			sample_fields["Ref_Depth"],_=sample.RefDepth()
+			sample_fields["Alt_depths"],_=sample.AltDepths()
 			var ann map[string]interface{}
 			//for each sample loop over anns and link
-			for _,ann=range anns{
-				if (reflect.ValueOf(ann["ANN_allele"]).String()==alt){
-					unpack(ann,sample_fields,common_fields,alt_fields)
+			if len(anns)<1{
+				unpack(sample_fields, common_fields, alt_fields)
+				encoder.Encode(ann)
+			}
+			for _, ann = range anns {
+				if (reflect.ValueOf(ann["ANN_allele"]).String() == alt) {
+					unpack(ann, sample_fields, common_fields, alt_fields)
 					encoder.Encode(ann)
 				}
 			}
@@ -266,5 +236,10 @@ func parse_vcf_record_ANN(variant *vcfgo.Variant,encoder *json.Encoder)  {
 func main() {
 	flag.Parse()
 	var filename=flag.Arg(0)
-	vcf_transform(filename)
+	var exts=strings.Split(filename,".")
+	if exts[len(exts)-1]=="gz" && exts[len(exts)-2]=="vcf"{
+		vcf_transform(filename,true)
+	}else if exts[len(exts)-1]=="vcf"{
+		vcf_transform(filename,false)
+	}
 }
