@@ -108,7 +108,34 @@ func vcf_transform(filename string,gzipped bool)  {
 	}
 	out.Flush()
 }
-
+func parse_vcf_field_array(val string, val_type string)[]interface{}{
+	var str_arr=strings.Split(val,",")
+	var ret []interface{}
+	var str string
+	for _,str=range str_arr{
+		switch val_type {
+		case "Integer":
+			var i,err=strconv.Atoi(str)
+			if err!=nil{
+				panic(err)
+			}else {
+				ret=append(ret,i)
+			}
+		case "Float":
+			var i,err=strconv.ParseFloat(str, 64)
+			if err!=nil{
+				panic(err)
+			}else {
+				ret=append(ret,i)
+			}
+		case "String":
+			ret=append(ret,str)
+		default:
+			panic(val_type)
+		}
+	}
+	return ret
+}
 
 func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 	//assign fields common to the row
@@ -190,7 +217,7 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 			for key, val = range sample.Fields {
 				if key != "DP" && key !="GT" &&key !="MQ" && key !="GL" && key !="GQ" && key !="AD"{
 					if variant.Header.SampleFormats[key].Number!="1"{
-						sample_fields[key]=val
+						sample_fields[key]=parse_vcf_field_array(val,variant.Header.SampleFormats[key].Type)
 					}else{
 						switch key_type := variant.Header.SampleFormats[key].Type; key_type {
 						case "Integer":
@@ -202,7 +229,7 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 						case "String":
 							sample_fields[key] = val
 						default:
-							panic(val)
+							panic(key_type)
 						}
 					}
 					if err!=nil{
@@ -211,9 +238,13 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 				}
 			}
 			sample_fields["DP"]=sample.DP
-			sample_fields["GT"]=sample.GT
+			if len(sample.GT)>0{
+				sample_fields["GT"]=sample.GT
+			}
 			sample_fields["MQ"]=sample.MQ
-			sample_fields["GL"]=sample.GL
+			if len(sample.GL)>0{
+				sample_fields["GL"]=sample.GL
+			}
 			sample_fields["GQ"]=sample.GQ
 			sample_fields["Ref_Depth"],_=sample.RefDepth()
 			sample_fields["Alt_depths"],_=sample.AltDepths()
