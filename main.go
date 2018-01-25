@@ -82,7 +82,7 @@ func unpack(main map[string]interface{}, maps ...map[string]interface{}){
 	}
 }
 
-func vcf_transform(filename string,gzipped bool)  {
+func vcf_transform(filename string,gzipped bool,mapping bool)  {
 	//Opens vcf and loops over rows
 	f, err := os.Open(filename)
 	var r io.Reader
@@ -95,9 +95,31 @@ func vcf_transform(filename string,gzipped bool)  {
 	if err != nil {
 		panic(err)
 	}
+
 	var variant *vcfgo.Variant
 	var out=bufio.NewWriter(os.Stdout)
 	var encoder=json.NewEncoder(out)
+	if mapping{
+		//j,_:=os.Create("mapping.json")
+		json_map:=make(map[string]map[string]map[string]string)
+		json_map["properties"]=make(map[string]map[string]string)
+		for key,val:=range vr.Header.Infos{
+			key = "INFO_"+key
+			json_map["properties"][key]=make(map[string]string)
+			switch val.Type {
+			case "Integer":
+				json_map["properties"][key]["type"]="long"
+			case "Float":
+				json_map["properties"][key]["type"]="float"
+			case "Flag":
+				json_map["properties"][key]["type"]="boolean"
+			default:
+				delete(json_map["properties"],key)
+			}
+
+		}
+		encoder.Encode(json_map)
+	}
 	for {
 		variant = vr.Read()
 		if variant==nil{
@@ -265,12 +287,13 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 }
 
 func main() {
+	var mapping=flag.Bool("mapping",false,"")
 	flag.Parse()
 	var filename=flag.Arg(0)
 	var exts=strings.Split(filename,".")
 	if exts[len(exts)-1]=="gz" && exts[len(exts)-2]=="vcf"{
-		vcf_transform(filename,true)
+		vcf_transform(filename,true,*mapping)
 	}else if exts[len(exts)-1]=="vcf"{
-		vcf_transform(filename,false)
+		vcf_transform(filename,false,*mapping)
 	}
 }
