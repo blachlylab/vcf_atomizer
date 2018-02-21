@@ -11,6 +11,7 @@ import (
 	"strings"
 	"strconv"
 	"compress/gzip"
+	//"fmt"
 )
 
 func annfield(anns []string)[]map[string]interface{}{
@@ -173,39 +174,41 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 	var anns []map[string]interface{}
 	var ann_strings []string
 	//parse the info fields
-	for _,info_key=range variant.Info().Keys(){
-		var res,_=variant.Info().Get(info_key)
-		var s=reflect.ValueOf(res)
-		var err error
-		if info_key=="ANN"{
-			ann_strings=make([]string, s.Len())
-			for i := 0; i < s.Len(); i++{
-				ann_strings[i]=s.Index(i).String()
-			}
-			if s.Type().Name()=="string" {
-				anns=annfield([]string{s.String()})
-			}else{
-				anns=annfield(ann_strings)
-			}
-		}else{
-			if variant.Header.Infos[info_key].Number!="1"{
-				common_fields["INFO_"+info_key] = res
-			}else {
-				switch key_type := variant.Header.Infos[info_key].Type; key_type {
-				case "Integer":
-					common_fields["INFO_"+info_key]= s.Int()
-				case "Float":
-					common_fields["INFO_"+info_key]= s.Float()
-				case "String":
-					common_fields["INFO_"+info_key] = s.String()
-				case "Flag":
-					common_fields["INFO_"+info_key] = true
-				default:
-					panic(res)
+	if !(len(variant.Info().Keys())==1&&variant.Info().Keys()[0]==""){
+		for _,info_key=range variant.Info().Keys(){
+			var res,_=variant.Info().Get(info_key)
+			var s=reflect.ValueOf(res)
+			var err error
+			if info_key=="ANN"{
+				ann_strings=make([]string, s.Len())
+				for i := 0; i < s.Len(); i++{
+					ann_strings[i]=s.Index(i).String()
 				}
-			}
-			if err!=nil{
-				panic(err)
+				if s.Type().Name()=="string" {
+					anns=annfield([]string{s.String()})
+				}else{
+					anns=annfield(ann_strings)
+				}
+			}else{
+				if variant.Header.Infos[info_key].Number!="1"{
+					common_fields["INFO_"+info_key] = res
+				}else {
+					switch key_type := variant.Header.Infos[info_key].Type; key_type {
+					case "Integer":
+						common_fields["INFO_"+info_key]= s.Int()
+					case "Float":
+						common_fields["INFO_"+info_key]= s.Float()
+					case "String":
+						common_fields["INFO_"+info_key] = s.String()
+					case "Flag":
+						common_fields["INFO_"+info_key] = true
+					default:
+						panic(res)
+					}
+				}
+				if err!=nil{
+					panic(err)
+				}
 			}
 		}
 	}
@@ -216,9 +219,21 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 		var alt_fields= make(map[string]interface{})
 		alt_fields["ALT"] = alt
 		if len(variant.Samples) < 1 {
-			unpack(alt_fields, common_fields)
-			encoder.Encode(alt_fields)
-			continue
+			if len(anns)<1{
+				unpack(alt_fields, common_fields)
+				encoder.Encode(alt_fields)
+				continue
+			}else{
+				var ann map[string]interface{}
+				for _, ann = range anns {
+					if (reflect.ValueOf(ann["ANN_allele"]).String() == alt) {
+						unpack(ann, common_fields, alt_fields)
+						encoder.Encode(ann)
+					}
+				}
+				continue
+			}
+
 		}
 		//loop over samples
 		for _, sample := range variant.Samples {
