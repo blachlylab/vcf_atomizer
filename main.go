@@ -83,7 +83,7 @@ func unpack(main map[string]interface{}, maps ...map[string]interface{}){
 	}
 }
 
-func vcf_transform(filename string,gzipped bool,mapping bool,meta string)  {
+func vcf_transform(filename string,gzipped bool,mapping string,meta string)  {
 	//Opens vcf and loops over rows
 	f, err := os.Open(filename)
 	var r io.Reader
@@ -100,8 +100,10 @@ func vcf_transform(filename string,gzipped bool,mapping bool,meta string)  {
 	var variant *vcfgo.Variant
 	var out=bufio.NewWriter(os.Stdout)
 	var encoder=json.NewEncoder(out)
-	if mapping{
-		//j,_:=os.Create("mapping.json")
+	if mapping!=""{
+		j,_:=os.Create(mapping)
+		var map_out=bufio.NewWriter(j)
+		var map_encoder=json.NewEncoder(map_out)
 		json_map:=make(map[string]map[string]map[string]string)
 		json_map["properties"]=make(map[string]map[string]string)
 		for key,val:=range vr.Header.Infos{
@@ -119,24 +121,23 @@ func vcf_transform(filename string,gzipped bool,mapping bool,meta string)  {
 			}
 
 		}
-		encoder.Encode(json_map)
+		map_encoder.Encode(json_map)
 	}
 	if meta!=""{
 		fi,_:=os.Create(meta)
 		var meta_out=bufio.NewWriter(fi)
 		var meta_encoder=json.NewEncoder(meta_out)
-		meta_map:=make(map[string]map[string]interface{})
 		for _,s:=range vr.Header.SampleNames{
-			meta_map[s]=make(map[string]interface{})
-			meta_map[s]["sample"]=s
-			meta_map[s]["type"]="variant_meta"
-			meta_map[s]["extras"]=vr.Header.Extras
-			meta_map[s]["file_format"]=vr.Header.FileFormat
-			meta_map[s]["filters"]=vr.Header.Filters
-			meta_map[s]["contigs"]=vr.Header.Contigs
-			meta_map[s]["infos"]=vr.Header.Infos
+			meta_map:=make(map[string]interface{})
+			meta_map["sample"]=s
+			meta_map["type"]="variant_meta"
+			meta_map["extras"]=vr.Header.Extras
+			meta_map["file_format"]=vr.Header.FileFormat
+			meta_map["filters"]=vr.Header.Filters
+			meta_map["contigs"]=vr.Header.Contigs
+			meta_map["infos"]=vr.Header.Infos
+			meta_encoder.Encode(meta_map)
 		}
-		meta_encoder.Encode(meta_map)
 		meta_out.Flush()
 		fi.Close()
 	}
@@ -321,7 +322,7 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 }
 
 func main() {
-	var mapping=flag.Bool("mapping",false,"")
+	var mapping=flag.String("mapping","","")
 	var meta=flag.String("meta","","")
 	flag.Parse()
 	var filename=flag.Arg(0)
