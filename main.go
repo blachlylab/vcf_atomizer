@@ -309,7 +309,7 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 			//for each sample loop over anns and link
 			if len(anns)<1{
 				unpack(sample_fields, common_fields, alt_fields)
-				encoder.Encode(ann)
+				encoder.Encode(sample_fields)
 			}
 			for _, ann = range anns {
 				if (reflect.ValueOf(ann["ANN_allele"]).String() == alt) {
