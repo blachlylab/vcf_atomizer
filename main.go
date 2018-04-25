@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"compress/gzip"
 	//"fmt"
+	"fmt"
 )
 
 func annfield(anns []string)[]map[string]interface{}{
@@ -322,9 +323,14 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 }
 
 func main() {
-	var mapping=flag.String("mapping","","")
-	var meta=flag.String("meta","","")
+	var mapping=flag.String("mapping","","print predicted elasticsearch mapping")
+	var meta=flag.String("meta","","write metadata to file")
+	var atom=flag.Bool("atom",false,"write Aegis atomizer.py config")
 	flag.Parse()
+	if *atom{
+		fmt.Println("atomizer [flags] [input]")
+		os.Exit(0)
+	}
 	var filename=flag.Arg(0)
 	var exts=strings.Split(filename,".")
 	if exts[len(exts)-1]=="gz" && exts[len(exts)-2]=="vcf"{
