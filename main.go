@@ -84,20 +84,21 @@ func unpack(main map[string]interface{}, maps ...map[string]interface{}){
 	}
 }
 
-func vcf_transform(filename string,gzipped bool,mapping string,meta string)  {
+func vcf_transform(filename string,mapping string,meta string)  {
 	//Opens vcf and loops over rows
 	f, err := os.Open(filename)
+	if err != nil {
+		panic(err)
+	}
 	var r io.Reader
-	if gzipped{
-		r,_=gzip.NewReader(f)
-	}else{
+	r,err=gzip.NewReader(f)
+	if err!=nil{
 		r=io.Reader(f)
 	}
 	vr, err := vcfgo.NewReader(r, false)
 	if err != nil {
-		panic(err)
+		// panic(err)
 	}
-
 	var variant *vcfgo.Variant
 	var out=bufio.NewWriter(os.Stdout)
 	var encoder=json.NewEncoder(out)
@@ -332,10 +333,5 @@ func main() {
 		os.Exit(0)
 	}
 	var filename=flag.Arg(0)
-	var exts=strings.Split(filename,".")
-	if exts[len(exts)-1]=="gz" && exts[len(exts)-2]=="vcf"{
-		vcf_transform(filename,true,*mapping,*meta)
-	}else if exts[len(exts)-1]=="vcf"{
-		vcf_transform(filename,false,*mapping,*meta)
-	}
+	vcf_transform(filename,*mapping,*meta)
 }
