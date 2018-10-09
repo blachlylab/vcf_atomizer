@@ -84,20 +84,21 @@ func unpack(main map[string]interface{}, maps ...map[string]interface{}){
 	}
 }
 
-func vcf_transform(filename string,gzipped bool,mapping string,meta string)  {
+func vcf_transform(filename string,mapping string,meta string,sr bool)  {
 	//Opens vcf and loops over rows
 	f, err := os.Open(filename)
+	if err != nil {
+		panic(err)
+	}
 	var r io.Reader
-	if gzipped{
-		r,_=gzip.NewReader(f)
-	}else{
+	r,err=gzip.NewReader(f)
+	if err!=nil{
 		r=io.Reader(f)
 	}
 	vr, err := vcfgo.NewReader(r, false)
 	if err != nil {
-		panic(err)
+		// panic(err)
 	}
-
 	var variant *vcfgo.Variant
 	var out=bufio.NewWriter(os.Stdout)
 	var encoder=json.NewEncoder(out)
@@ -147,7 +148,7 @@ func vcf_transform(filename string,gzipped bool,mapping string,meta string)  {
 		if variant==nil{
 			break
 		}
-		parse_vcf_record(variant,encoder)
+		parse_vcf_record(variant,encoder,sr)
 
 	}
 	out.Flush()
@@ -181,7 +182,7 @@ func parse_vcf_field_array(val string, val_type string)[]interface{}{
 	return ret
 }
 
-func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
+func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder,sr bool)  {
 	//assign fields common to the row
 	var common_fields = make(map[string]interface{})
 	common_fields["type"]="variant_vcf"
@@ -312,12 +313,19 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 				unpack(sample_fields, common_fields, alt_fields)
 				encoder.Encode(sample_fields)
 			}
-			for _, ann = range anns {
-				if (reflect.ValueOf(ann["ANN_allele"]).String() == alt) {
-					unpack(ann, sample_fields, common_fields, alt_fields)
-					encoder.Encode(ann)
-				}
-			}
+            if sr{
+                unpack(sample_fields, common_fields, alt_fields)
+                sample_fields["ANN"]=anns
+                encoder.Encode(sample_fields)
+            }else{
+                for _, ann = range anns {
+                    if (reflect.ValueOf(ann["ANN_allele"]).String() == alt) {
+                        unpack(ann, sample_fields, common_fields, alt_fields)
+                        encoder.Encode(ann)
+                    }
+                }
+
+            }
 		}
 	}
 }
@@ -326,16 +334,12 @@ func main() {
 	var mapping=flag.String("mapping","","print predicted elasticsearch mapping")
 	var meta=flag.String("meta","","write metadata to file")
 	var atom=flag.Bool("atom",false,"write Aegis atomizer.py config")
+    var sr=flag.Bool("one",false,"do not permute rows by annotations")
 	flag.Parse()
 	if *atom{
 		fmt.Println("atomizer [flags] [input]")
 		os.Exit(0)
 	}
 	var filename=flag.Arg(0)
-	var exts=strings.Split(filename,".")
-	if exts[len(exts)-1]=="gz" && exts[len(exts)-2]=="vcf"{
-		vcf_transform(filename,true,*mapping,*meta)
-	}else if exts[len(exts)-1]=="vcf"{
-		vcf_transform(filename,false,*mapping,*meta)
-	}
+	vcf_transform(filename,*mapping,*meta,*sr)
 }
