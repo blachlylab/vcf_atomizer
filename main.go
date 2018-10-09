@@ -257,7 +257,7 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 
 		}
 		//loop over samples
-		for _, sample := range variant.Samples {
+		for samidx, sample := range variant.Samples {
 			var found= false
 			var gt int
 			for _, gt = range sample.GT {
@@ -269,7 +269,7 @@ func parse_vcf_record(variant *vcfgo.Variant,encoder *json.Encoder)  {
 				continue
 			}
 			var sample_fields= make(map[string]interface{})
-			sample_fields["sample"] = variant.Header.SampleNames[index]
+			sample_fields["sample"] = variant.Header.SampleNames[samidx]
 			var key, val string
 			var err error
 			for key, val = range sample.Fields {
