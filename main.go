@@ -52,12 +52,12 @@ func annfield(anns []string)[]map[string]interface{}{
 	var res= make([]map[string]interface{},0)
 	var effects []string
 	for _, ann_string = range anns{
-		var eff_map=make(map[string]interface{})
 		ann_arr =strings.Split(ann_string,"|")
 		effects=strings.Split(ann_arr[1],"&")
 		var i int
 		var val,effect string
 		for _,effect=range effects{
+		    var eff_map=make(map[string]interface{})
 			for i,val=range ann_arr {
 				if i ==1{
 					eff_map["ANN_"+field_list[i]]=effect
