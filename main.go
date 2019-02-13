@@ -95,6 +95,8 @@ func vcf_transform(filename string, mapping string, meta string, sr bool) {
 	var r io.Reader
 	r, err = gzip.NewReader(f)
 	if err != nil {
+		f.Close()
+		f, err = os.Open(filename)
 		r = io.Reader(f)
 	}
 	vr, err := vcfgo.NewReader(r, false)
