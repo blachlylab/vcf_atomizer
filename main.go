@@ -196,7 +196,10 @@ func parse_vcf_field_array(val string, val_type string) []interface{} {
 			var i, err = strconv.ParseFloat(str, 64)
 			if err != nil {
 				panic(err)
-			} else {
+			}
+			if math.IsInf(i,0) || math.IsNaN(i) {
+				ret = append(ret, nil)
+			}else{
 				ret = append(ret, i)
 			}
 		case "String":
@@ -316,7 +319,13 @@ func parse_vcf_record(variant *vcfgo.Variant, encoder *json.Encoder, sr bool) {
 							sample_fields[key], err = strconv.Atoi(val)
 						case "Float":
 							if val != "." {
-								sample_fields[key], err = strconv.ParseFloat(val, 64)
+								var i float64
+								i, err = strconv.ParseFloat(val, 64)
+								if math.IsInf(i,0) || math.IsNaN(i) {
+									sample_fields[key]=nil
+								}else{
+									sample_fields[key]=i
+								}
 							}
 						case "String":
 							sample_fields[key] = val
