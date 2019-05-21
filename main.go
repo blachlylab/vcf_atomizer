@@ -95,8 +95,14 @@ func vcf_transform(filename string, mapping string, meta string, sr bool) {
 	var r io.Reader
 	r, err = gzip.NewReader(f)
 	if err != nil {
-		f.Close()
+		err=f.Close()
+		if err!=nil{
+			panic(err)
+		}
 		f, err = os.Open(filename)
+		if err!=nil{
+			panic(err)
+		}
 		r = io.Reader(f)
 	}
 	vr, err := vcfgo.NewReader(r, false)
@@ -127,7 +133,10 @@ func vcf_transform(filename string, mapping string, meta string, sr bool) {
 			}
 
 		}
-		map_encoder.Encode(json_map)
+		err=map_encoder.Encode(json_map)
+		if err!=nil{
+			panic(err)
+		}
 	}
 	if meta != "" {
 		fi, _ := os.Create(meta)
@@ -142,10 +151,19 @@ func vcf_transform(filename string, mapping string, meta string, sr bool) {
 			meta_map["filters"] = vr.Header.Filters
 			meta_map["contigs"] = vr.Header.Contigs
 			meta_map["infos"] = vr.Header.Infos
-			meta_encoder.Encode(meta_map)
+			err=meta_encoder.Encode(meta_map)
+			if err!=nil{
+				panic(err)
+			}
 		}
-		meta_out.Flush()
-		fi.Close()
+		err=meta_out.Flush()
+		if err!=nil{
+			panic(err)
+		}
+		err=fi.Close()
+		if err!=nil{
+			panic(err)
+		}
 	}
 	for {
 		variant = vr.Read()
@@ -155,7 +173,10 @@ func vcf_transform(filename string, mapping string, meta string, sr bool) {
 		parse_vcf_record(variant, encoder, sr)
 
 	}
-	out.Flush()
+	err=out.Flush()
+	if err!=nil{
+		panic(err)
+	}
 }
 func parse_vcf_field_array(val string, val_type string) []interface{} {
 	var str_arr = strings.Split(val, ",")
@@ -200,11 +221,11 @@ func parse_vcf_record(variant *vcfgo.Variant, encoder *json.Encoder, sr bool) {
 	var anns []map[string]interface{}
 	var ann_strings []string
 	//parse the info fields
+	var err error
 	if !(len(variant.Info().Keys()) == 1 && variant.Info().Keys()[0] == "") {
 		for _, info_key = range variant.Info().Keys() {
 			var res, _ = variant.Info().Get(info_key)
 			var s = reflect.ValueOf(res)
-			var err error
 			if info_key == "ANN" {
 				ann_strings = make([]string, s.Len())
 				for i := 0; i < s.Len(); i++ {
@@ -232,9 +253,6 @@ func parse_vcf_record(variant *vcfgo.Variant, encoder *json.Encoder, sr bool) {
 						panic(res)
 					}
 				}
-				if err != nil {
-					panic(err)
-				}
 			}
 		}
 	}
@@ -247,14 +265,20 @@ func parse_vcf_record(variant *vcfgo.Variant, encoder *json.Encoder, sr bool) {
 		if len(variant.Samples) < 1 {
 			if len(anns) < 1 {
 				unpack(alt_fields, common_fields)
-				encoder.Encode(alt_fields)
+				err=encoder.Encode(alt_fields)
+				if err!=nil{
+					panic(err)
+				}
 				continue
 			} else {
 				var ann map[string]interface{}
 				for _, ann = range anns {
 					if reflect.ValueOf(ann["ANN_allele"]).String() == alt {
 						unpack(ann, common_fields, alt_fields)
-						encoder.Encode(ann)
+						err=encoder.Encode(ann)
+						if err!=nil{
+							panic(err)
+						}
 					}
 				}
 				continue
@@ -315,20 +339,26 @@ func parse_vcf_record(variant *vcfgo.Variant, encoder *json.Encoder, sr bool) {
 			//for each sample loop over anns and link
 			if len(anns) < 1 {
 				unpack(sample_fields, common_fields, alt_fields)
-				encoder.Encode(sample_fields)
+				err=encoder.Encode(sample_fields)
 			}
 			if sr {
 				unpack(sample_fields, common_fields, alt_fields)
 				sample_fields["ANN"] = anns
-				encoder.Encode(sample_fields)
+				err=encoder.Encode(sample_fields)
 			} else {
 				for _, ann = range anns {
 					if reflect.ValueOf(ann["ANN_allele"]).String() == alt {
 						unpack(ann, sample_fields, common_fields, alt_fields)
-						encoder.Encode(ann)
+						err=encoder.Encode(ann)
+					}
+					if err !=nil {
+						panic(err)
 					}
 				}
 
+			}
+			if err !=nil {
+				panic(err)
 			}
 		}
 	}
