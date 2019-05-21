@@ -294,7 +294,7 @@ func parse_vcf_record(variant *vcfgo.Variant, encoder *json.Encoder, sr bool) {
 					found = true
 				}
 			}
-			if !found {
+			if !found && len(sample.GT)!=0{
 				continue
 			}
 			var sample_fields = make(map[string]interface{})
