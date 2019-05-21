@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"io"
+	"math"
 	"os"
 	"reflect"
 	"strconv"
@@ -244,7 +245,11 @@ func parse_vcf_record(variant *vcfgo.Variant, encoder *json.Encoder, sr bool) {
 					case "Integer":
 						common_fields["INFO_"+info_key] = s.Int()
 					case "Float":
-						common_fields["INFO_"+info_key] = s.Float()
+						if math.IsInf(s.Float(),0) || math.IsNaN(s.Float()) {
+							common_fields["INFO_"+info_key] = nil
+						}else {
+							common_fields["INFO_"+info_key] = s.Float()
+						}
 					case "String":
 						common_fields["INFO_"+info_key] = s.String()
 					case "Flag":
