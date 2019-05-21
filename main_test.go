@@ -197,3 +197,25 @@ func Test_parse_vcf_record(t *testing.T){
 	//json.NewDecoder(out).Decode(&res)
 	t.Log(out.String())
 }
+
+func Test_parse_vcf_record2(t *testing.T){
+	f, err := os.Open("index.vcf")
+	if err != nil {
+		t.Error("Cannot load test vcf")
+	}
+	vr, err := vcfgo.NewReader(f, false)
+	if err != nil {
+		t.Error("Cannot create vcf reader")
+	}
+	var out bytes.Buffer
+	out.Grow(4096)
+	var o = bufio.NewWriter(&out)
+	var encoder=json.NewEncoder(o)
+	var v=vr.Read()
+	t.Log(v.String())
+	parse_vcf_record(v,encoder,false)
+	o.Flush()
+	//var res interface{}
+	//json.NewDecoder(out).Decode(&res)
+	t.Log(out.String())
+}
