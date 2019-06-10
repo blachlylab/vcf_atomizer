@@ -13,9 +13,6 @@ import (
 	"strings"
 
 	"github.com/brentp/vcfgo"
-
-	//"fmt"
-	"fmt"
 )
 
 func annfield(anns []string) []map[string]interface{} {
@@ -381,13 +378,11 @@ func parse_vcf_record(variant *vcfgo.Variant, encoder *json.Encoder, sr bool) {
 func main() {
 	var mapping = flag.String("mapping", "", "print predicted elasticsearch mapping")
 	var meta = flag.String("meta", "", "write metadata to file")
-	var atom = flag.Bool("atom", false, "write Aegis atomizer.py config")
 	var sr = flag.Bool("one", false, "do not permute rows by annotations")
 	flag.Parse()
-	if *atom {
-		fmt.Println("atomizer [flags] [input]")
-		os.Exit(0)
-	}
 	var filename = flag.Arg(0)
-	vcf_transform(filename, *mapping, *meta, *sr)
+	if(filename!=""){
+		vcf_transform(filename, *mapping, *meta, *sr)
+	}
+	flag.PrintDefaults()
 }
