@@ -7,7 +7,7 @@ GOGET=$(GOCMD) get
 BINARY_NAME=bin/vcf_atomizer
 BINARY_UNIX=$(BINARY_NAME)
 
-all: test build
+all: deps test build
 build:
 	$(GOBUILD) -o $(BINARY_NAME) -v
 test:
