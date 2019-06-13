@@ -4,7 +4,7 @@ GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
-BINARY_NAME=bin/atomizer
+BINARY_NAME=bin/vcf_atomizer
 BINARY_UNIX=$(BINARY_NAME)
 
 all: test build
