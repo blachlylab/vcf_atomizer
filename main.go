@@ -383,6 +383,7 @@ func main() {
 	var filename = flag.Arg(0)
 	if(filename!=""){
 		vcf_transform(filename, *mapping, *meta, *sr)
+	}else {
+		flag.PrintDefaults()
 	}
-	flag.PrintDefaults()
 }
