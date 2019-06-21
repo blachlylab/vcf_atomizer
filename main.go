@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-
+	"fmt"
 	"github.com/brentp/vcfgo"
 )
 
@@ -307,7 +307,7 @@ func parse_vcf_record(variant *vcfgo.Variant, encoder *json.Encoder, sr bool) {
 			var key, val string
 			var err error
 			for key, val = range sample.Fields {
-				if key != "DP" && key != "GT" && key != "MQ" && key != "GL" && key != "GQ" && key != "AD" {
+				if key != "DP" && key != "GT" && key != "MQ" && key != "GL" && key != "GQ" {
 					if variant.Header.SampleFormats[key].Number != "1" {
 						sample_fields[key] = parse_vcf_field_array(val, variant.Header.SampleFormats[key].Type)
 					} else {
@@ -331,21 +331,24 @@ func parse_vcf_record(variant *vcfgo.Variant, encoder *json.Encoder, sr bool) {
 						}
 					}
 					if err != nil {
+						fmt.Fprintln(os.Stderr,key)
 						panic(err)
 					}
 				}
 			}
-			sample_fields["DP"] = sample.DP
-			if len(sample.GT) > 0 {
-				sample_fields["GT"] = sample.GT
+			if !(len(sample.GT) > 0) {
+				delete(sample_fields, "GT")
 			}
-			sample_fields["MQ"] = sample.MQ
-			if len(sample.GL) > 0 {
-				sample_fields["GL"] = sample.GL
+			if !(len(sample.GL) > 0) {
+				delete(sample_fields, "GL")
 			}
 			sample_fields["GQ"] = sample.GQ
-			sample_fields["Ref_Depth"], _ = sample.RefDepth()
-			sample_fields["Alt_depths"], _ = sample.AltDepths()
+			if _, ok := variant.Header.SampleFormats["AD"]; ok {
+				if(variant.Header.SampleFormats["AD"].Number!="1"){
+					sample_fields["Ref_Depth"], _ = sample.RefDepth()
+					sample_fields["Alt_depths"], _ = sample.AltDepths()
+				}
+			}
 			var ann map[string]interface{}
 			//for each sample loop over anns and link
 			if len(anns) < 1 {
