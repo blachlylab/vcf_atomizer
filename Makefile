@@ -7,7 +7,7 @@ GOGET=$(GOCMD) get
 BINARY_NAME=bin/vcf_atomizer
 BINARY_UNIX=$(BINARY_NAME)
 
-all: deps test build
+all: deps build
 build:
 	$(GOBUILD) -o $(BINARY_NAME) -v
 test:
@@ -21,7 +21,7 @@ run:
 	./$(BINARY_NAME)
 deps:
 	$(GOGET) github.com/brentp/vcfgo
-
+	$(GOGET) github.com/brentp/xopen
 
 # Cross compilation
 build-linux:
