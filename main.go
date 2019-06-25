@@ -2,10 +2,8 @@ package main
 
 import (
 	"bufio"
-	"compress/gzip"
 	"encoding/json"
 	"flag"
-	"io"
 	"math"
 	"os"
 	"reflect"
@@ -13,6 +11,7 @@ import (
 	"strings"
 	"fmt"
 	"github.com/brentp/vcfgo"
+	"github.com/brentp/xopen"
 )
 
 func annfield(anns []string) []map[string]interface{} {
@@ -86,22 +85,9 @@ func unpack(main map[string]interface{}, maps ...map[string]interface{}) {
 
 func vcf_transform(filename string, mapping string, meta string, sr bool) {
 	//Opens vcf and loops over rows
-	f, err := os.Open(filename)
+	r, err := xopen.Ropen(filename)
 	if err != nil {
 		panic(err)
-	}
-	var r io.Reader
-	r, err = gzip.NewReader(f)
-	if err != nil {
-		err=f.Close()
-		if err!=nil{
-			panic(err)
-		}
-		f, err = os.Open(filename)
-		if err!=nil{
-			panic(err)
-		}
-		r = io.Reader(f)
 	}
 	vr, err := vcfgo.NewReader(r, false)
 	if err != nil {
